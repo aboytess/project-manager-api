@@ -1,0 +1,61 @@
+from flask import jsonify
+
+
+class APIError(Exception):
+    status_code = 500
+    message = 'Internal server error'
+
+    def __init__(self, message=None, status_code=None):
+        if message:
+            self.message = message
+        if status_code:
+            self.status_code = status_code
+
+
+class NotFoundError(APIError):
+    status_code = 404
+    message = 'Resource not found'
+
+
+class ValidationError(APIError):
+    status_code = 400
+    message = 'Validation error'
+
+
+class ConflictError(APIError):
+    status_code = 409
+    message = 'Conflict'
+
+
+def register_error_handlers(app):
+    @app.errorhandler(APIError)
+    def handle_api_error(error):
+        return jsonify({
+            'error': error.__class__.__name__,
+            'message': error.message,
+            'status_code': error.status_code
+        }), error.status_code
+
+    @app.errorhandler(404)
+    def handle_404(error):
+        return jsonify({
+            'error': 'NotFound',
+            'message': 'The requested resource was not found',
+            'status_code': 404
+        }), 404
+
+    @app.errorhandler(405)
+    def handle_405(error):
+        return jsonify({
+            'error': 'MethodNotAllowed',
+            'message': 'Method not allowed',
+            'status_code': 405
+        }), 405
+
+    @app.errorhandler(500)
+    def handle_500(error):
+        return jsonify({
+            'error': 'InternalServerError',
+            'message': 'An unexpected error occurred',
+            'status_code': 500
+        }), 500
