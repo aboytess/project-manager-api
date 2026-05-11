@@ -27,6 +27,16 @@ class ConflictError(APIError):
     message = 'Conflict'
 
 
+class UnauthorizedError(APIError):
+    status_code = 401
+    message = 'Unauthorized'
+
+
+class ForbiddenError(APIError):
+    status_code = 403
+    message = 'Forbidden'
+
+
 def register_error_handlers(app):
     @app.errorhandler(APIError)
     def handle_api_error(error):

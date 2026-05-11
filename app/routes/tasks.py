@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 from ..extensions import db
 from ..models.task import Task
 from ..models.project import Project
@@ -11,6 +12,7 @@ VALID_PRIORITIES = {'low', 'medium', 'high'}
 
 
 @tasks_bp.route('/<int:project_id>/tasks', methods=['GET'])
+@jwt_required()
 def get_tasks(project_id):
     project = Project.query.get(project_id)
     if not project:
@@ -19,6 +21,7 @@ def get_tasks(project_id):
 
 
 @tasks_bp.route('/<int:project_id>/tasks/<int:task_id>', methods=['GET'])
+@jwt_required()
 def get_task(project_id, task_id):
     task = Task.query.filter_by(id=task_id, project_id=project_id).first()
     if not task:
@@ -27,6 +30,7 @@ def get_task(project_id, task_id):
 
 
 @tasks_bp.route('/<int:project_id>/tasks', methods=['POST'])
+@jwt_required()
 def create_task(project_id):
     project = Project.query.get(project_id)
     if not project:
@@ -58,6 +62,7 @@ def create_task(project_id):
 
 
 @tasks_bp.route('/<int:project_id>/tasks/<int:task_id>', methods=['PUT'])
+@jwt_required()
 def update_task(project_id, task_id):
     task = Task.query.filter_by(id=task_id, project_id=project_id).first()
     if not task:
@@ -87,6 +92,7 @@ def update_task(project_id, task_id):
 
 
 @tasks_bp.route('/<int:project_id>/tasks/<int:task_id>', methods=['DELETE'])
+@jwt_required()
 def delete_task(project_id, task_id):
     task = Task.query.filter_by(id=task_id, project_id=project_id).first()
     if not task:
