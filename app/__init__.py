@@ -1,7 +1,8 @@
-from flask import Flask, jsonify
+from flask import Flask
 from .config import DevelopmentConfig
-from .extensions import db, migrate, jwt, jwt_blocklist
+from .extensions import db, migrate, jwt
 from .errors import register_error_handlers
+from .jwt_handlers import register_jwt_handlers
 
 
 def create_app(config_class=DevelopmentConfig):
@@ -12,34 +13,20 @@ def create_app(config_class=DevelopmentConfig):
     migrate.init_app(app, db)
     jwt.init_app(app)
 
-    @jwt.token_in_blocklist_loader
-    def check_if_token_revoked(jwt_header, jwt_payload):
-        return jwt_payload['jti'] in jwt_blocklist
+    register_jwt_handlers(jwt)
 
-    @jwt.expired_token_loader
-    def expired_token_callback(jwt_header, jwt_payload):
-        return jsonify({'error': 'TokenExpired', 'message': 'The token has expired', 'status_code': 401}), 401
-
-    @jwt.invalid_token_loader
-    def invalid_token_callback(error):
-        return jsonify({'error': 'InvalidToken', 'message': 'Token signature verification failed', 'status_code': 401}), 401
-
-    @jwt.unauthorized_loader
-    def missing_token_callback(error):
-        return jsonify({'error': 'Unauthorized', 'message': 'Request does not contain an access token', 'status_code': 401}), 401
-
-    @jwt.revoked_token_loader
-    def revoked_token_callback(jwt_header, jwt_payload):
-        return jsonify({'error': 'TokenRevoked', 'message': 'The token has been revoked', 'status_code': 401}), 401
-
-    from .models import User, Project, Task  # noqa: F401
+    from .models import User, Project, Task, ProjectMember, RevokedToken  # noqa: F401
 
     from .routes.auth import auth_bp
     from .routes.projects import projects_bp
     from .routes.tasks import tasks_bp
+    from .routes.members import members_bp
+    from .routes.users import users_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(projects_bp)
     app.register_blueprint(tasks_bp)
+    app.register_blueprint(members_bp)
+    app.register_blueprint(users_bp)
 
     register_error_handlers(app)
 

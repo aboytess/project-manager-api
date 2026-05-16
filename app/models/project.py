@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 from ..extensions import db
 
@@ -5,13 +6,14 @@ from ..extensions import db
 class Project(db.Model):
     __tablename__ = 'projects'
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text)
-    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    owner_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     tasks = db.relationship('Task', backref='project', lazy=True, cascade='all, delete-orphan')
+    members = db.relationship('ProjectMember', backref='project', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
         return {

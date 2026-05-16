@@ -46,6 +46,14 @@ def register_error_handlers(app):
             'status_code': error.status_code
         }), error.status_code
 
+    @app.errorhandler(400)
+    def handle_400(error):
+        return jsonify({
+            'error': 'BadRequest',
+            'message': 'Bad request',
+            'status_code': 400
+        }), 400
+
     @app.errorhandler(404)
     def handle_404(error):
         return jsonify({
