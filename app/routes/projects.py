@@ -4,7 +4,7 @@ from sqlalchemy.orm import joinedload
 from ..extensions import db
 from ..models.project import Project
 from ..models.project_member import ProjectMember
-from ..validators import parse_json, validate_string, validate_optional_string, get_accessible_project, get_owned_project
+from ..validators import parse_json, validate_string, validate_optional_string, get_accessible_project, get_managed_project, get_owned_project
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/api/projects')
 
@@ -52,7 +52,7 @@ def create_project():
 @projects_bp.route('/<project_id>', methods=['PUT'])
 @jwt_required()
 def update_project(project_id: str):
-    project = get_owned_project(project_id, current_user_id())
+    project = get_managed_project(project_id, current_user_id())
     data = parse_json()
     if 'name' in data:
         project.name = validate_string(data['name'], 'name', max_length=120)

@@ -5,7 +5,7 @@ from ..extensions import db
 from ..models.task import Task
 from ..validators import (
     parse_json, validate_string, validate_optional_string,
-    validate_enum, validate_assignee, get_accessible_project, get_task_in_project
+    validate_enum, validate_date, validate_assignee, get_accessible_project, get_task_in_project
 )
 
 tasks_bp = Blueprint('tasks', __name__, url_prefix='/api/projects')
@@ -46,7 +46,8 @@ def create_task(project_id: str):
         status=validate_enum(data.get('status', 'todo'), 'status', VALID_STATUSES),
         priority=validate_enum(data.get('priority', 'medium'), 'priority', VALID_PRIORITIES),
         project_id=project_id,
-        assignee_id=assignee_id
+        assignee_id=assignee_id,
+        due_date=validate_date(data['due_date'], 'due_date') if data.get('due_date') else None
     )
     db.session.add(task)
     db.session.commit()
@@ -69,6 +70,8 @@ def update_task(project_id: str, task_id: str):
         task.priority = validate_enum(data['priority'], 'priority', VALID_PRIORITIES)
     if 'assignee_id' in data:
         task.assignee_id = validate_assignee(data['assignee_id'], project_id) if data['assignee_id'] else None
+    if 'due_date' in data:
+        task.due_date = validate_date(data['due_date'], 'due_date') if data['due_date'] else None
     db.session.commit()
     return jsonify(task.to_dict()), 200
 

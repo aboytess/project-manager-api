@@ -1,5 +1,6 @@
+from datetime import datetime
 from flask import request
-from .errors import ValidationError, NotFoundError, ForbiddenError
+from .errors import ValidationError, NotFoundError
 from .models.project import Project
 from .models.task import Task
 from .models.project_member import ProjectMember
@@ -37,9 +38,21 @@ def validate_optional_string(value: object, field_name: str, max_length: int) ->
 
 
 def validate_enum(value: object, field_name: str, valid_values: set) -> str:
+    if not isinstance(value, str):
+        raise ValidationError(f'{field_name} must be a string')
+    value = value.lower().strip()
     if value not in valid_values:
         raise ValidationError(f'{field_name} must be one of: {", ".join(sorted(valid_values))}')
     return value
+
+
+def validate_date(value: object, field_name: str) -> datetime:
+    if not isinstance(value, str):
+        raise ValidationError(f'{field_name} must be a string in ISO 8601 format')
+    try:
+        return datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError:
+        raise ValidationError(f'{field_name} must be a valid ISO 8601 date (e.g. 2026-12-31)')
 
 
 def validate_assignee(assignee_id: object, project_id: str) -> str:
@@ -52,21 +65,33 @@ def validate_assignee(assignee_id: object, project_id: str) -> str:
 
 
 def get_accessible_project(project_id: str, user_id: str) -> Project:
-    project = Project.query.get(project_id)
+    project = (Project.query
+               .join(ProjectMember, Project.id == ProjectMember.project_id)
+               .filter(Project.id == project_id, ProjectMember.user_id == user_id)
+               .first())
     if not project:
         raise NotFoundError(f'Project {project_id} not found')
-    member = ProjectMember.query.filter_by(project_id=project_id, user_id=user_id).first()
-    if not member:
-        raise ForbiddenError('You do not have permission to access this project')
+    return project
+
+
+def get_managed_project(project_id: str, user_id: str) -> Project:
+    project = (Project.query
+               .join(ProjectMember, Project.id == ProjectMember.project_id)
+               .filter(
+                   Project.id == project_id,
+                   ProjectMember.user_id == user_id,
+                   ProjectMember.role.in_(['owner', 'admin'])
+               )
+               .first())
+    if not project:
+        raise NotFoundError(f'Project {project_id} not found')
     return project
 
 
 def get_owned_project(project_id: str, user_id: str) -> Project:
-    project = Project.query.get(project_id)
+    project = Project.query.filter_by(id=project_id, owner_id=user_id).first()
     if not project:
         raise NotFoundError(f'Project {project_id} not found')
-    if project.owner_id != user_id:
-        raise ForbiddenError('Only the project owner can perform this action')
     return project
 
 
