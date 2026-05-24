@@ -1,26 +1,35 @@
 from datetime import datetime, timezone
-from flask import Blueprint, jsonify
+from flask import jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask_openapi3 import APIBlueprint, Tag
 from ..extensions import db
 from ..models.user import User
 from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.revoked_token import RevokedToken
 from ..errors import NotFoundError, ConflictError
+from ..schemas.paths import UserPath
 
-users_bp = Blueprint('users', __name__, url_prefix='/api/users')
+_tag = Tag(name='users', description='User operations')
+
+users_bp = APIBlueprint(
+    'users', __name__,
+    url_prefix='/api/users',
+    abp_tags=[_tag],
+    abp_security=[{'bearerAuth': []}]
+)
 
 
-@users_bp.route('/<user_id>', methods=['GET'])
+@users_bp.get('/<user_id>', summary='Get a public user profile by ID')
 @jwt_required()
-def get_user(user_id: str):
-    user = User.query.get(user_id)
+def get_user(path: UserPath):
+    user = User.query.get(path.user_id)
     if not user:
-        raise NotFoundError(f'User {user_id} not found')
+        raise NotFoundError(f'User {path.user_id} not found')
     return jsonify(user.to_public_dict()), 200
 
 
-@users_bp.route('/me', methods=['DELETE'])
+@users_bp.delete('/me', summary='Delete own account and revoke current token')
 @jwt_required()
 def delete_user():
     user_id = get_jwt_identity()

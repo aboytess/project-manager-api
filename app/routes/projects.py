@@ -1,19 +1,28 @@
-from flask import Blueprint, jsonify
+from flask import jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from sqlalchemy.orm import joinedload
+from flask_openapi3 import APIBlueprint, Tag
 from ..extensions import db
 from ..models.project import Project
 from ..models.project_member import ProjectMember
-from ..validators import parse_json, validate_string, validate_optional_string, get_accessible_project, get_managed_project, get_owned_project
+from ..validators import validate_string, validate_optional_string, get_accessible_project, get_managed_project, get_owned_project
+from ..schemas.paths import ProjectPath
+from ..schemas.projects import CreateProjectBody, UpdateProjectBody
 
-projects_bp = Blueprint('projects', __name__, url_prefix='/api/projects')
+_tag = Tag(name='projects', description='Project CRUD operations')
+
+projects_bp = APIBlueprint(
+    'projects', __name__,
+    url_prefix='/api/projects',
+    abp_tags=[_tag],
+    abp_security=[{'bearerAuth': []}]
+)
 
 
 def current_user_id() -> str:
     return get_jwt_identity()
 
 
-@projects_bp.route('', methods=['GET'])
+@projects_bp.get('', summary='List all projects the current user belongs to')
 @jwt_required()
 def get_projects():
     user_id = current_user_id()
@@ -24,21 +33,20 @@ def get_projects():
     return jsonify([p.to_dict() for p in projects]), 200
 
 
-@projects_bp.route('/<project_id>', methods=['GET'])
+@projects_bp.get('/<project_id>', summary='Get a project by ID')
 @jwt_required()
-def get_project(project_id: str):
-    project = get_accessible_project(project_id, current_user_id())
+def get_project(path: ProjectPath):
+    project = get_accessible_project(path.project_id, current_user_id())
     return jsonify(project.to_dict()), 200
 
 
-@projects_bp.route('', methods=['POST'])
+@projects_bp.post('', summary='Create a new project')
 @jwt_required()
-def create_project():
+def create_project(body: CreateProjectBody):
     user_id = current_user_id()
-    data = parse_json()
     project = Project(
-        name=validate_string(data.get('name'), 'name', max_length=120),
-        description=validate_optional_string(data.get('description'), 'description', max_length=500),
+        name=validate_string(body.name, 'name', max_length=120),
+        description=validate_optional_string(body.description, 'description', max_length=500),
         owner_id=user_id
     )
     db.session.add(project)
@@ -49,23 +57,23 @@ def create_project():
     return jsonify(project.to_dict()), 201
 
 
-@projects_bp.route('/<project_id>', methods=['PUT'])
+@projects_bp.put('/<project_id>', summary='Update a project (owner or admin)')
 @jwt_required()
-def update_project(project_id: str):
-    project = get_managed_project(project_id, current_user_id())
-    data = parse_json()
+def update_project(path: ProjectPath, body: UpdateProjectBody):
+    project = get_managed_project(path.project_id, current_user_id())
+    data = body.model_dump(exclude_unset=True)
     if 'name' in data:
-        project.name = validate_string(data['name'], 'name', max_length=120)
+        project.name = validate_string(body.name, 'name', max_length=120)
     if 'description' in data:
-        project.description = validate_optional_string(data['description'], 'description', max_length=500)
+        project.description = validate_optional_string(body.description, 'description', max_length=500)
     db.session.commit()
     return jsonify(project.to_dict()), 200
 
 
-@projects_bp.route('/<project_id>', methods=['DELETE'])
+@projects_bp.delete('/<project_id>', summary='Delete a project (owner only)')
 @jwt_required()
-def delete_project(project_id: str):
-    project = get_owned_project(project_id, current_user_id())
+def delete_project(path: ProjectPath):
+    project = get_owned_project(path.project_id, current_user_id())
     db.session.delete(project)
     db.session.commit()
     return jsonify({'message': f'Project {project.name} deleted successfully'}), 200

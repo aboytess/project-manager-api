@@ -1,13 +1,23 @@
-from flask import Blueprint, jsonify
+from flask import jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_openapi3 import APIBlueprint, Tag
 from sqlalchemy.orm import joinedload
 from ..extensions import db
 from ..models.user import User
 from ..models.project_member import ProjectMember
-from ..validators import parse_json, validate_enum, get_accessible_project, get_managed_project
+from ..validators import validate_string, validate_enum, get_accessible_project, get_managed_project
 from ..errors import NotFoundError, ConflictError, ValidationError
+from ..schemas.paths import ProjectPath, MemberPath
+from ..schemas.members import AddMemberBody, UpdateRoleBody
 
-members_bp = Blueprint('members', __name__, url_prefix='/api/projects')
+_tag = Tag(name='members', description='Project member management')
+
+members_bp = APIBlueprint(
+    'members', __name__,
+    url_prefix='/api/projects',
+    abp_tags=[_tag],
+    abp_security=[{'bearerAuth': []}]
+)
 
 VALID_ROLES = {'member', 'admin'}
 
@@ -16,51 +26,47 @@ def current_user_id() -> str:
     return get_jwt_identity()
 
 
-@members_bp.route('/<project_id>/members', methods=['GET'])
+@members_bp.get('/<project_id>/members', summary='List all members of a project')
 @jwt_required()
-def get_members(project_id: str):
-    get_accessible_project(project_id, current_user_id())
+def get_members(path: ProjectPath):
+    get_accessible_project(path.project_id, current_user_id())
     members = (ProjectMember.query
                .options(joinedload(ProjectMember.user))
-               .filter_by(project_id=project_id)
+               .filter_by(project_id=path.project_id)
                .all())
     return jsonify([m.to_dict() for m in members]), 200
 
 
-@members_bp.route('/<project_id>/members', methods=['POST'])
+@members_bp.post('/<project_id>/members', summary='Add a member to a project (owner or admin)')
 @jwt_required()
-def add_member(project_id: str):
-    get_managed_project(project_id, current_user_id())
-    data = parse_json()
+def add_member(path: ProjectPath, body: AddMemberBody):
+    get_managed_project(path.project_id, current_user_id())
 
-    user_id = data.get('user_id')
-    if not user_id or not isinstance(user_id, str):
-        raise ValidationError('user_id is required')
+    user_id = validate_string(body.user_id, 'user_id', max_length=36)
 
     user = User.query.get(user_id)
     if not user:
         raise NotFoundError(f'User {user_id} not found')
-    if ProjectMember.query.filter_by(project_id=project_id, user_id=user_id).first():
+    if ProjectMember.query.filter_by(project_id=path.project_id, user_id=user_id).first():
         raise ConflictError('User is already a member of this project')
 
-    member = ProjectMember(project_id=project_id, user_id=user_id, role='member')
+    member = ProjectMember(project_id=path.project_id, user_id=user_id, role='member')
     db.session.add(member)
     db.session.commit()
     return jsonify(member.to_dict()), 201
 
 
-@members_bp.route('/<project_id>/members/<user_id>', methods=['PUT'])
+@members_bp.put('/<project_id>/members/<user_id>', summary="Update a member's role (owner or admin)")
 @jwt_required()
-def update_member_role(project_id: str, user_id: str):
-    project = get_managed_project(project_id, current_user_id())
+def update_member_role(path: MemberPath, body: UpdateRoleBody):
+    project = get_managed_project(path.project_id, current_user_id())
 
-    if user_id == project.owner_id:
+    if path.user_id == project.owner_id:
         raise ValidationError('Cannot change the role of the project owner')
 
-    data = parse_json()
-    role = validate_enum(data.get('role'), 'role', VALID_ROLES)
+    role = validate_enum(body.role, 'role', VALID_ROLES)
 
-    member = ProjectMember.query.filter_by(project_id=project_id, user_id=user_id).first()
+    member = ProjectMember.query.filter_by(project_id=path.project_id, user_id=path.user_id).first()
     if not member:
         raise NotFoundError('User is not a member of this project')
 
@@ -69,15 +75,15 @@ def update_member_role(project_id: str, user_id: str):
     return jsonify(member.to_dict()), 200
 
 
-@members_bp.route('/<project_id>/members/<user_id>', methods=['DELETE'])
+@members_bp.delete('/<project_id>/members/<user_id>', summary='Remove a member from a project (owner or admin)')
 @jwt_required()
-def remove_member(project_id: str, user_id: str):
-    project = get_managed_project(project_id, current_user_id())
+def remove_member(path: MemberPath):
+    project = get_managed_project(path.project_id, current_user_id())
 
-    if user_id == project.owner_id:
+    if path.user_id == project.owner_id:
         raise ValidationError('Cannot remove the project owner')
 
-    member = ProjectMember.query.filter_by(project_id=project_id, user_id=user_id).first()
+    member = ProjectMember.query.filter_by(project_id=path.project_id, user_id=path.user_id).first()
     if not member:
         raise NotFoundError('User is not a member of this project')
 
