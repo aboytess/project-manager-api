@@ -38,6 +38,27 @@ class ForbiddenError(APIError):
 
 
 def register_error_handlers(app):
+    @app.after_request
+    def normalize_pydantic_422(response):
+        if response.status_code == 422:
+            data = response.get_json(silent=True)
+            if data and 'detail' in data:
+                errors = data['detail']
+                if errors:
+                    first = errors[0]
+                    loc = [str(l) for l in first.get('loc', [])[1:]]
+                    field = '.'.join(loc)
+                    msg = first.get('msg', 'Validation failed')
+                    message = f'{field}: {msg}' if field else msg
+                else:
+                    message = 'Request validation failed'
+                return jsonify({
+                    'error': 'ValidationError',
+                    'message': message,
+                    'status_code': 422
+                }), 422
+        return response
+
     @app.errorhandler(APIError)
     def handle_api_error(error):
         return jsonify({

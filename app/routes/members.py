@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload
 from ..extensions import db
 from ..models.user import User
 from ..models.project_member import ProjectMember
-from ..validators import validate_string, validate_enum, get_accessible_project, get_managed_project
+from ..validators import get_accessible_project, get_managed_project
 from ..errors import NotFoundError, ConflictError, ValidationError
 from ..schemas.paths import ProjectPath, MemberPath
 from ..schemas.members import AddMemberBody, UpdateRoleBody
@@ -18,8 +18,6 @@ members_bp = APIBlueprint(
     abp_tags=[_tag],
     abp_security=[{'bearerAuth': []}]
 )
-
-VALID_ROLES = {'member', 'admin'}
 
 
 def current_user_id() -> str:
@@ -42,21 +40,19 @@ def get_members(path: ProjectPath):
 def add_member(path: ProjectPath, body: AddMemberBody):
     get_managed_project(path.project_id, current_user_id())
 
-    user_id = validate_string(body.user_id, 'user_id', max_length=36)
-
-    user = User.query.get(user_id)
+    user = User.query.get(body.user_id)
     if not user:
-        raise NotFoundError(f'User {user_id} not found')
-    if ProjectMember.query.filter_by(project_id=path.project_id, user_id=user_id).first():
+        raise NotFoundError(f'User {body.user_id} not found')
+    if ProjectMember.query.filter_by(project_id=path.project_id, user_id=body.user_id).first():
         raise ConflictError('User is already a member of this project')
 
-    member = ProjectMember(project_id=path.project_id, user_id=user_id, role='member')
+    member = ProjectMember(project_id=path.project_id, user_id=body.user_id, role='member')
     db.session.add(member)
     db.session.commit()
     return jsonify(member.to_dict()), 201
 
 
-@members_bp.put('/<project_id>/members/<user_id>', summary="Update a member's role (owner or admin)")
+@members_bp.patch('/<project_id>/members/<user_id>', summary="Update a member's role (owner or admin)")
 @jwt_required()
 def update_member_role(path: MemberPath, body: UpdateRoleBody):
     project = get_managed_project(path.project_id, current_user_id())
@@ -64,13 +60,11 @@ def update_member_role(path: MemberPath, body: UpdateRoleBody):
     if path.user_id == project.owner_id:
         raise ValidationError('Cannot change the role of the project owner')
 
-    role = validate_enum(body.role, 'role', VALID_ROLES)
-
     member = ProjectMember.query.filter_by(project_id=path.project_id, user_id=path.user_id).first()
     if not member:
         raise NotFoundError('User is not a member of this project')
 
-    member.role = role
+    member.role = body.role
     db.session.commit()
     return jsonify(member.to_dict()), 200
 

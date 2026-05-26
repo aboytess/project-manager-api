@@ -4,7 +4,7 @@ from flask_openapi3 import APIBlueprint, Tag
 from ..extensions import db
 from ..models.project import Project
 from ..models.project_member import ProjectMember
-from ..validators import validate_string, validate_optional_string, get_accessible_project, get_managed_project, get_owned_project
+from ..validators import get_accessible_project, get_managed_project, get_owned_project
 from ..schemas.paths import ProjectPath
 from ..schemas.projects import CreateProjectBody, UpdateProjectBody
 
@@ -45,27 +45,27 @@ def get_project(path: ProjectPath):
 def create_project(body: CreateProjectBody):
     user_id = current_user_id()
     project = Project(
-        name=validate_string(body.name, 'name', max_length=120),
-        description=validate_optional_string(body.description, 'description', max_length=500),
+        name=body.name,
+        description=body.description,
         owner_id=user_id
     )
     db.session.add(project)
-    db.session.flush()  # populates project.id before commit
+    db.session.flush()
     membership = ProjectMember(project_id=project.id, user_id=user_id, role='owner')
     db.session.add(membership)
     db.session.commit()
     return jsonify(project.to_dict()), 201
 
 
-@projects_bp.put('/<project_id>', summary='Update a project (owner or admin)')
+@projects_bp.patch('/<project_id>', summary='Update a project (owner or admin)')
 @jwt_required()
 def update_project(path: ProjectPath, body: UpdateProjectBody):
     project = get_managed_project(path.project_id, current_user_id())
     data = body.model_dump(exclude_unset=True)
     if 'name' in data:
-        project.name = validate_string(body.name, 'name', max_length=120)
+        project.name = body.name
     if 'description' in data:
-        project.description = validate_optional_string(body.description, 'description', max_length=500)
+        project.description = body.description
     db.session.commit()
     return jsonify(project.to_dict()), 200
 

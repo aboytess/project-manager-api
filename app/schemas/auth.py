@@ -1,12 +1,13 @@
 from pydantic import BaseModel
+from .types import UsernameStr, EmailStr, PasswordStr
 
 
 class RegisterBody(BaseModel):
-    username: str
-    email: str
-    password: str
+    username: UsernameStr
+    email: EmailStr
+    password: PasswordStr
 
 
 class LoginBody(BaseModel):
-    email: str
+    email: EmailStr
     password: str

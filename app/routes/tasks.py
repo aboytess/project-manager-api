@@ -4,10 +4,7 @@ from flask_openapi3 import APIBlueprint, Tag
 from sqlalchemy.orm import joinedload
 from ..extensions import db
 from ..models.task import Task
-from ..validators import (
-    validate_string, validate_optional_string,
-    validate_enum, validate_date, validate_assignee, get_accessible_project, get_task_in_project
-)
+from ..validators import validate_date, validate_assignee, get_accessible_project, get_task_in_project
 from ..schemas.paths import ProjectPath, TaskPath
 from ..schemas.tasks import CreateTaskBody, UpdateTaskBody
 
@@ -19,9 +16,6 @@ tasks_bp = APIBlueprint(
     abp_tags=[_tag],
     abp_security=[{'bearerAuth': []}]
 )
-
-VALID_STATUSES = {'todo', 'in_progress', 'done'}
-VALID_PRIORITIES = {'low', 'medium', 'high'}
 
 
 def current_user_id() -> str:
@@ -48,14 +42,13 @@ def get_task(path: TaskPath):
 @jwt_required()
 def create_task(path: ProjectPath, body: CreateTaskBody):
     get_accessible_project(path.project_id, current_user_id())
-    assignee_id = validate_assignee(body.assignee_id, path.project_id) if body.assignee_id else None
     task = Task(
-        title=validate_string(body.title, 'title', max_length=200),
-        description=validate_optional_string(body.description, 'description', max_length=1000),
-        status=validate_enum(body.status, 'status', VALID_STATUSES),
-        priority=validate_enum(body.priority, 'priority', VALID_PRIORITIES),
+        title=body.title,
+        description=body.description,
+        status=body.status,
+        priority=body.priority,
         project_id=path.project_id,
-        assignee_id=assignee_id,
+        assignee_id=validate_assignee(body.assignee_id, path.project_id) if body.assignee_id else None,
         due_date=validate_date(body.due_date, 'due_date') if body.due_date else None
     )
     db.session.add(task)
@@ -63,20 +56,20 @@ def create_task(path: ProjectPath, body: CreateTaskBody):
     return jsonify(task.to_dict()), 201
 
 
-@tasks_bp.put('/<project_id>/tasks/<task_id>', summary='Update a task')
+@tasks_bp.patch('/<project_id>/tasks/<task_id>', summary='Update a task')
 @jwt_required()
 def update_task(path: TaskPath, body: UpdateTaskBody):
     get_accessible_project(path.project_id, current_user_id())
     task = get_task_in_project(path.task_id, path.project_id)
     data = body.model_dump(exclude_unset=True)
     if 'title' in data:
-        task.title = validate_string(body.title, 'title', max_length=200)
+        task.title = body.title
     if 'description' in data:
-        task.description = validate_optional_string(body.description, 'description', max_length=1000)
+        task.description = body.description
     if 'status' in data:
-        task.status = validate_enum(body.status, 'status', VALID_STATUSES)
+        task.status = body.status
     if 'priority' in data:
-        task.priority = validate_enum(body.priority, 'priority', VALID_PRIORITIES)
+        task.priority = body.priority
     if 'assignee_id' in data:
         task.assignee_id = validate_assignee(body.assignee_id, path.project_id) if body.assignee_id else None
     if 'due_date' in data:

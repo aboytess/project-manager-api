@@ -6,8 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from ..extensions import db
 from ..models.user import User
 from ..models.revoked_token import RevokedToken
-from ..validators import validate_string
-from ..errors import ValidationError, ConflictError, UnauthorizedError
+from ..errors import ConflictError, UnauthorizedError
 from ..schemas.auth import RegisterBody, LoginBody
 
 _tag = Tag(name='auth', description='Authentication and token management')
@@ -26,18 +25,16 @@ def _issue_tokens(user: User) -> dict:
 
 @auth_bp.post('/register', summary='Register a new user')
 def register(body: RegisterBody):
-    username = validate_string(body.username, 'username', max_length=80)
-    email = validate_string(body.email, 'email', max_length=120).lower()
-    password = validate_string(body.password, 'password', max_length=128)
-
-    if len(password) < 8:
-        raise ValidationError('password must be at least 8 characters')
-    if User.query.filter_by(email=email).first():
+    if User.query.filter_by(email=body.email).first():
         raise ConflictError('email already registered')
-    if User.query.filter_by(username=username).first():
+    if User.query.filter_by(username=body.username).first():
         raise ConflictError('username already taken')
 
-    user = User(username=username, email=email, password_hash=generate_password_hash(password))
+    user = User(
+        username=body.username,
+        email=body.email,
+        password_hash=generate_password_hash(body.password)
+    )
     db.session.add(user)
     db.session.commit()
 
@@ -46,11 +43,8 @@ def register(body: RegisterBody):
 
 @auth_bp.post('/login', summary='Login and receive tokens')
 def login(body: LoginBody):
-    email = validate_string(body.email, 'email', max_length=120).lower()
-    password = validate_string(body.password, 'password', max_length=128)
-
-    user = User.query.filter_by(email=email).first()
-    if not user or not check_password_hash(user.password_hash, password):
+    user = User.query.filter_by(email=body.email).first()
+    if not user or not check_password_hash(user.password_hash, body.password):
         raise UnauthorizedError('Invalid email or password')
 
     return jsonify(_issue_tokens(user)), 200

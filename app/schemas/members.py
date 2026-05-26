@@ -1,9 +1,10 @@
 from pydantic import BaseModel
+from .types import UUIDStr, ProjectRole
 
 
 class AddMemberBody(BaseModel):
-    user_id: str
+    user_id: UUIDStr
 
 
 class UpdateRoleBody(BaseModel):
-    role: str
+    role: ProjectRole
