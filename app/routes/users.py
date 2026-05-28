@@ -9,6 +9,8 @@ from ..models.project_member import ProjectMember
 from ..models.revoked_token import RevokedToken
 from ..errors import NotFoundError, ConflictError
 from ..schemas.paths import UserPath
+from ..schemas.users import UserPublicResponse
+from ..schemas.shared import MessageResponse, UnauthorizedResponse, NotFoundResponse, ConflictResponse
 
 _tag = Tag(name='users', description='User operations')
 
@@ -20,7 +22,16 @@ users_bp = APIBlueprint(
 )
 
 
-@users_bp.get('/<user_id>', summary='Get a public user profile by ID')
+@users_bp.get(
+    '/<user_id>',
+    summary='Get a public user profile by ID',
+    description='Returns a user\'s public profile (id and username only).',
+    responses={
+        '200': UserPublicResponse,
+        '401': UnauthorizedResponse,
+        '404': NotFoundResponse
+    }
+)
 @jwt_required()
 def get_user(path: UserPath):
     user = User.query.get(path.user_id)
@@ -29,7 +40,20 @@ def get_user(path: UserPath):
     return jsonify(user.to_public_dict()), 200
 
 
-@users_bp.delete('/me', summary='Delete own account and revoke current token')
+@users_bp.delete(
+    '/me',
+    summary='Delete own account and revoke current token',
+    description=(
+        'Permanently deletes the authenticated user\'s account and revokes the current token. '
+        'Fails with 409 if the user still owns any projects — transfer ownership or delete them first.'
+    ),
+    responses={
+        '200': MessageResponse,
+        '401': UnauthorizedResponse,
+        '404': NotFoundResponse,
+        '409': ConflictResponse
+    }
+)
 @jwt_required()
 def delete_user():
     user_id = get_jwt_identity()

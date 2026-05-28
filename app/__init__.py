@@ -1,4 +1,4 @@
-from flask_openapi3 import OpenAPI, Info
+from flask_openapi3 import OpenAPI, Info, Contact, License
 from .config import DevelopmentConfig
 from .extensions import db, migrate, jwt
 from .errors import register_error_handlers
@@ -6,8 +6,17 @@ from .jwt_handlers import register_jwt_handlers
 
 _info = Info(
     title='Project Manager API',
-    version='1.0.0',
-    description='A mini Jira-like REST API for managing projects, tasks, and teams.'
+    version='1.1.0',
+    description=(
+        'A REST API for managing projects, tasks, and teams — inspired by tools like Jira.\n\n'
+        '## Authentication\n'
+        'Most endpoints require a Bearer token. Use `POST /api/auth/login` to obtain one, '
+        'then include it in the `Authorization: Bearer <token>` header.\n\n'
+        '## Roles\n'
+        'Projects support three roles: **owner** (full control), **admin** (can manage members and tasks), '
+        'and **member** (can view and edit tasks).'
+    ),
+    contact=Contact(name='Andres', email='aboytes623@gmail.com')
 )
 
 _security_schemes = {

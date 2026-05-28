@@ -8,7 +8,11 @@ from ..models.project_member import ProjectMember
 from ..validators import get_accessible_project, get_managed_project
 from ..errors import NotFoundError, ConflictError, ValidationError
 from ..schemas.paths import ProjectPath, MemberPath
-from ..schemas.members import AddMemberBody, UpdateRoleBody
+from ..schemas.members import AddMemberBody, UpdateRoleBody, MemberResponse, MemberListResponse
+from ..schemas.shared import (
+    MessageResponse, BadRequestResponse, UnauthorizedResponse,
+    NotFoundResponse, ConflictResponse, UnprocessableResponse
+)
 
 _tag = Tag(name='members', description='Project member management')
 
@@ -24,7 +28,16 @@ def current_user_id() -> str:
     return get_jwt_identity()
 
 
-@members_bp.get('/<project_id>/members', summary='List all members of a project')
+@members_bp.get(
+    '/<project_id>/members',
+    summary='List all members of a project',
+    description='Returns all members of a project. Requires membership in the project (any role).',
+    responses={
+        '200': MemberListResponse,
+        '401': UnauthorizedResponse,
+        '404': NotFoundResponse
+    }
+)
 @jwt_required()
 def get_members(path: ProjectPath):
     get_accessible_project(path.project_id, current_user_id())
@@ -35,7 +48,22 @@ def get_members(path: ProjectPath):
     return jsonify([m.to_dict() for m in members]), 200
 
 
-@members_bp.post('/<project_id>/members', summary='Add a member to a project (owner or admin)')
+@members_bp.post(
+    '/<project_id>/members',
+    summary='Add a member to a project (owner or admin)',
+    description=(
+        'Adds a user to a project as a member. Requires Owner or Admin role. '
+        'Returns 404 if the project does not exist, the target user does not exist, '
+        'or the authenticated user does not have sufficient privileges.'
+    ),
+    responses={
+        '201': MemberResponse,
+        '401': UnauthorizedResponse,
+        '404': NotFoundResponse,
+        '409': ConflictResponse,
+        '422': UnprocessableResponse
+    }
+)
 @jwt_required()
 def add_member(path: ProjectPath, body: AddMemberBody):
     get_managed_project(path.project_id, current_user_id())
@@ -52,7 +80,22 @@ def add_member(path: ProjectPath, body: AddMemberBody):
     return jsonify(member.to_dict()), 201
 
 
-@members_bp.patch('/<project_id>/members/<user_id>', summary="Update a member's role (owner or admin)")
+@members_bp.patch(
+    '/<project_id>/members/<user_id>',
+    summary="Update a member's role (owner or admin)",
+    description=(
+        'Updates the role of a project member. Requires Owner or Admin role. '
+        'The project owner\'s role cannot be changed. '
+        'Returns 404 if the project does not exist or the authenticated user lacks sufficient privileges.'
+    ),
+    responses={
+        '200': MemberResponse,
+        '400': BadRequestResponse,
+        '401': UnauthorizedResponse,
+        '404': NotFoundResponse,
+        '422': UnprocessableResponse
+    }
+)
 @jwt_required()
 def update_member_role(path: MemberPath, body: UpdateRoleBody):
     project = get_managed_project(path.project_id, current_user_id())
@@ -69,7 +112,21 @@ def update_member_role(path: MemberPath, body: UpdateRoleBody):
     return jsonify(member.to_dict()), 200
 
 
-@members_bp.delete('/<project_id>/members/<user_id>', summary='Remove a member from a project (owner or admin)')
+@members_bp.delete(
+    '/<project_id>/members/<user_id>',
+    summary='Remove a member from a project (owner or admin)',
+    description=(
+        'Removes a member from a project. Requires Owner or Admin role. '
+        'The project owner cannot be removed. '
+        'Returns 404 if the project does not exist or the authenticated user lacks sufficient privileges.'
+    ),
+    responses={
+        '200': MessageResponse,
+        '400': BadRequestResponse,
+        '401': UnauthorizedResponse,
+        '404': NotFoundResponse
+    }
+)
 @jwt_required()
 def remove_member(path: MemberPath):
     project = get_managed_project(path.project_id, current_user_id())
