@@ -1,0 +1,6 @@
+services:
+  web:
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_DEBUG=1
