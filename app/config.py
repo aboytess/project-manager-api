@@ -1,6 +1,7 @@
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from sqlalchemy.pool import NullPool, StaticPool
 
 load_dotenv()
 
@@ -23,6 +24,14 @@ class ProductionConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
 
 
+def _test_engine_options() -> dict:
+    url = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
+    if url.startswith("sqlite"):
+        return {"poolclass": StaticPool, "connect_args": {"check_same_thread": False}}
+    return {"poolclass": NullPool}
+
+
 class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
+    SQLALCHEMY_ENGINE_OPTIONS = _test_engine_options()
