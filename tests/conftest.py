@@ -20,38 +20,45 @@ def client(app):
 
 @pytest.fixture()
 def registered_user(client):
-    resp = client.post('/api/auth/register', json={
-        'username': 'testuser',
-        'email': 'test@example.com',
-        'password': 'password123'
-    })
+    resp = client.post(
+        "/api/auth/register",
+        json={
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "password123",
+        },
+    )
     return resp.get_json()
 
 
 @pytest.fixture()
 def auth_headers(registered_user):
-    return {'Authorization': f'Bearer {registered_user["access_token"]}'}
+    return {"Authorization": f"Bearer {registered_user['access_token']}"}
 
 
 @pytest.fixture()
 def second_user(client):
-    resp = client.post('/api/auth/register', json={
-        'username': 'otheruser',
-        'email': 'other@example.com',
-        'password': 'password123'
-    })
+    resp = client.post(
+        "/api/auth/register",
+        json={
+            "username": "otheruser",
+            "email": "other@example.com",
+            "password": "password123",
+        },
+    )
     return resp.get_json()
 
 
 @pytest.fixture()
 def second_auth_headers(second_user):
-    return {'Authorization': f'Bearer {second_user["access_token"]}'}
+    return {"Authorization": f"Bearer {second_user['access_token']}"}
 
 
 @pytest.fixture()
 def project(client, auth_headers):
-    resp = client.post('/api/projects', json={
-        'name': 'Test Project',
-        'description': 'A test project'
-    }, headers=auth_headers)
+    resp = client.post(
+        "/api/projects",
+        json={"name": "Test Project", "description": "A test project"},
+        headers=auth_headers,
+    )
     return resp.get_json()
