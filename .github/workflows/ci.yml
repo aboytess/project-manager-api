@@ -50,6 +50,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db?connect_timeout=10
+      SECRET_KEY: ci-secret-key
+      JWT_SECRET_KEY: ci-jwt-secret
+
     services:
       postgres:
         image: postgres:15
@@ -85,9 +90,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Verify PostgreSQL connection
+        run: python -c "import psycopg2; conn = psycopg2.connect('$TEST_DATABASE_URL'); print('PostgreSQL connection OK'); conn.close()"
+
       - name: Run tests
-        env:
-          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          SECRET_KEY: ci-secret-key
-          JWT_SECRET_KEY: ci-jwt-secret
-        run: pytest
+        run: pytest -v
