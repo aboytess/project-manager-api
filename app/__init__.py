@@ -1,4 +1,4 @@
-from flask_openapi3 import OpenAPI, Info, Contact, License
+from flask_openapi3 import OpenAPI, Info, Contact
 from .config import DevelopmentConfig
 from .extensions import db, migrate, jwt
 from .errors import register_error_handlers

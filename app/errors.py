@@ -46,7 +46,7 @@ def register_error_handlers(app):
                 errors = data['detail']
                 if errors:
                     first = errors[0]
-                    loc = [str(l) for l in first.get('loc', [])[1:]]
+                    loc = [str(part) for part in first.get('loc', [])[1:]]
                     field = '.'.join(loc)
                     msg = first.get('msg', 'Validation failed')
                     message = f'{field}: {msg}' if field else msg
